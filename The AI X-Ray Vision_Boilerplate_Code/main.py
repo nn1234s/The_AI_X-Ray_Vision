@@ -53,6 +53,40 @@ def analyze_image(file):
         response_format={"type": "json_object"}
     )
     return json.loads(response.choices[0].message.content)
+def hud(img, scene, objects, page, total):
+    img = img.convert("RGBA")
+    overlay = Image.new("RGBA", img.size, (0,0,0,0))
+    draw = ImageDraw.Draw(overlay)
+    (w,h), (title_font, label_font, small_font) = img.size, fonts()
+    green = (57, 255, 20, 255)
+    panel = (0, 20, 10, 185)
+    red   = (255, 60, 60, 255)
+    draw.rectangle((20, 20, w - 20, 70), fill=panel)
+    draw.text((35,32), f"[ {scene.upper()} [{page}/{total}]]", fill=green, font=title_font)
+    draw.ellipse((w - 120, 28, w - 104, 44), fill=red)
+    draw.text((w - 96, 26), "REC", fill=green, font=label_font)
+    for obj in objects:
+        box = obj.get("box", {})
+        if not all (k in box for k in ("x","y","w","h")):
+            continue
+        x1, y1, x2, y2 = px(box, w, h)
+        draw.rectangle((x1,y1,x2,y2), outline=green, width=2)
+        for a, b, c, d in [
+            (x1, y1, x1+18, y1),(x1, y1, x1, y1+18),
+            (x1, y1, x2+18, y1),(x1, y1, x2, y1+18),
+            (x1, y1, x1+18, y1),(x1, y1, x1, y2-18),
+            (x1, y1, x2+18, y1),(x1, y1, x2, y2-18),
+        ]:
+            draw.line((a,b,c,d), fill=green, width=3)
+        label    = obj.get("short_label", obj.get("name", "UNKNOWN")).upper()
+        meta     = obj.get("fun_metadata", "NO DATA")
+        conf     = obj.get("confidence", "low").upper()
+        panel_y  = max(80, y1 - 55)
+        if panel_y < 80:
+            panel_y = min(h - 80, y2 + 10)   
+        panel_x1 = x1
+        panel_x2 = min(w - 20, x1 + 320)     
+        panel_y2
 def px(box, w, h):
     values = [box["x"], box["y"], box["x"] + box["w"], box["y"] + box["h"]]
     return tuple(max(0, min(int(v * s / 100), s - 1)) for v, s in zip(values, (w, h, w, h)))
@@ -85,6 +119,37 @@ group_size = st.selectbox("Objects per scanner image!", [3,4], index=1)
 if file:
     original = Image.open(BytesIO(file.getvalue()))
     st.image(original, caption="Original imagee", use_container_width=True)  
+if st.button("Scan Image 😀"):
+    if not config.GROQ_API_KEY:
+        st.error("Somethings not right. Contact ZingQuark Support at zq1012@gmail.com (GitHub error NOkey)")
+    elif not file:
+        st.warning("Please Upload A Image!!")  
+    else:
+        with st.spinner("ZingQuark's AI are Processing your Image..."):
+            try:
+                data          = analyze_image(file)  
+                scene         = data.get("scene_title","AI SCAN Mode")
+                object_groups = groups(prepare_objects(data.get("objects", [])), group_size)
+                image         = Image.open(BytesIO(file.getvalue()))
+                st.session_state.xray_outputs = [
+                    hud(image, scene, group, i, len(object_groups))
+                    for i, group in enumerate(object_groups, 1)
+                ]
+                st.success(f"SCAN completed! Created {len(st.session_state.xray_outputs)} scanner image(S).") 
+            except Exception as error:
+                st.error(f"things dont seem right,, contact zingquark191@gmail.com to assist with your query {error}")     
+if st.session_state.xray_outputs:
+    st.markdown("## Scanner Results!!")
+    for i, output in enumerate(st.session_state.xray_outputs, 1):
+        st.image(output, caption=f"ScannerImage {i}", use_container_width=True)    
+        st.download_button(
+            f"📁 download scanner Image. {i}",
+            img_bytes(output),
+            f"ai_xray_vision_{i}.png",
+            "image/png",
+            key=f"download_{i}",
+
+        )                 
 
 
 
