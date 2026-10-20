@@ -86,7 +86,19 @@ def hud(img, scene, objects, page, total):
             panel_y = min(h - 80, y2 + 10)   
         panel_x1 = x1
         panel_x2 = min(w - 20, x1 + 320)     
-        panel_y2
+        panel_y2 = panel_y + 45
+        draw.rectangle((panel_x1, panel_y, panel_x2, panel_y2), fill=panel, outline=green, width=2)
+        draw.text((panel_x1+8, panel_y+6), f"[ITEM] {label}", fill=green, font=label_font)
+        draw.line(
+            (panel_x1+20, panel_y2 if panel_y < y1 else panel_y,
+             x1+10, y1+10 if panel_y < y1 else y2-10), fill=green, width=2
+        )
+    draw.rectangle((20, h-55, w-20, h-20), fill=panel)
+    draw.text((30, h-45), f"OBJECTS IN THIS scan: {len(objects)} | SCANMODE ACTIVEE",fill=green, font=label_font)    
+    return Image.alpha_composite(img, overlay).convert("RGB")
+
+
+
 def px(box, w, h):
     values = [box["x"], box["y"], box["x"] + box["w"], box["y"] + box["h"]]
     return tuple(max(0, min(int(v * s / 100), s - 1)) for v, s in zip(values, (w, h, w, h)))
@@ -114,6 +126,10 @@ def fonts():
         return [ImageFont.truetype("arial.ttf", size) for size in (28,18,14)]
     except Exception:
         return [ImageFont.load_default()] * 3
+def img_bytes(img):
+    buffer = io.BytesIO()
+    img.save(buffer, format="PNG")    
+    return buffer.getvalue()
 file = st.file_uploader("Upload a photo", type=["png","jpg","jpeg","webp"]) 
 group_size = st.selectbox("Objects per scanner image!", [3,4], index=1) 
 if file:
